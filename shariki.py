@@ -9,6 +9,7 @@ client = socket.socket(socket.AF_INET)
 client.connect(("localhost",5555))
 
 other_players_balls = {}
+my_id= None
 # Клас кульки
 class Ball:
     def __init__(self, x, y, radius, color, speed=0):
@@ -47,7 +48,34 @@ class Ball:
             (WINDOW_SIZE[0] // 2, WINDOW_SIZE[1] // 2),
             int(self.radius * scale)
         )
-
+def receive_data():
+    global my_id , other_players_balls
+    while True:
+        try:
+            data = client.recv(4096)
+            msg = pickle.loads(data)
+            if msg ["type" ] == "id":
+                my_id = msg["id"]
+                print("my_id:",my_id)
+            elif msg ["type"] =="state":
+                players = msg ["players"]
+                for pid , (x,y,r) in players.items():
+                    if my_id is not None and pid == my_id:
+                        continue
+                    if  pid not in other_players_balls:
+                        other_players_balls[pid] = Ball(x,y,r(255,0,0))
+                    else:
+                        b= other_players_balls[pid]
+                        b.x=x
+                        b.y=y
+                        b.radius=r
+                for pid in list (other_players_balls.keys()):
+                    if pid not in players:
+                        del other_players_balls[pid]
+        except Exception as e:
+            print("Error",e)
+            
+threading.Thread(target=receive_data,daemon=True).start()
 
 # Налаштування
 WINDOW_SIZE = 700, 500 # ⬅️🔃
@@ -102,7 +130,9 @@ while running:
 
     for ball in to_remove:
         balls.remove(ball)
-
+    client.sendall(pickle.dumps((player.x,player.y,player.radius)))
+    for ball in other_players_balls.values():
+        ball.draw(player.x, player.y , scale)
     display.update()
     clock.tick(60)
 
